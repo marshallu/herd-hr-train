@@ -17,19 +17,9 @@ if ( have_posts() ) {
 
 		$post_id = get_the_ID(); // phpcs:ignore
 
-		$registrations = get_posts(
-			array(
-				'numberposts' => -1,
-				'post_type'   => 'mu-registrations',
-				'meta_key'    => 'muhr_registration_training_session', // phpcs:ignore
-				'meta_value'  => $post_id, // phpcs:ignore
-			)
-		);
-
-		wp_reset_postdata();
-
+		$seats_taken = mu_hr_training_registration_count( $post_id );
 		$seats_total = get_field( 'mu_training_training_seats', $post_id );
-		$seats_left  = intval( $seats_total ) - intval( count( $registrations ) );
+		$seats_left  = intval( $seats_total ) - $seats_taken;
 
 		$start_date = DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $post_id ) );
 		$end_date   = DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_end_time', $post_id ) );
@@ -40,7 +30,7 @@ if ( have_posts() ) {
 			'id'                 => $post_id,
 			'title'              => get_the_title(),
 			'seats_left'         => $seats_left,
-			'seats_taken'        => count( $registrations ),
+			'seats_taken'        => $seats_taken,
 			'start_month'        => $start_date ? $start_date->format( 'M' ) : '',
 			'start_day'          => $start_date ? $start_date->format( 'j' ) : '',
 			'start_formatted'    => $start_date ? $start_date->format( 'F j, g:ia' ) : '',

@@ -27,7 +27,11 @@ function mu_hr_registration_register_shortcode( $atts ) {
 	} else {
 
 		$training_session = get_post( absint( get_query_var( 'courseid' ) ) );
-		$seats_total      = get_post_meta( absint( get_query_var( 'courseid' ) ), 'mu_training_training_seats', true );
+		if ( ! $training_session || 'mu-session' !== $training_session->post_type ) {
+			return 'Sorry that course was not found.';
+		}
+
+		$seats_total = get_post_meta( $training_session->ID, 'mu_training_training_seats', true );
 
 		if ( get_field( 'mu_training_benefits_training', $training_session->ID ) ) {
 			$fields = array(
@@ -59,18 +63,7 @@ function mu_hr_registration_register_shortcode( $atts ) {
 			);
 		}
 
-		$registrations = get_posts(
-			array(
-				'numberposts' => -1,
-				'post_type'   => 'mu-registrations',
-				'meta_key'    => 'muhr_registration_training_session', // phpcs:ignore
-				'meta_value'  => absint( get_query_var( 'courseid' ) ), // phpcs:ignore
-			)
-		);
-
-		wp_reset_postdata();
-
-		if ( intval( count( $registrations ) ) >= intval( $seats_total ) ) {
+		if ( mu_hr_training_registration_count( $training_session->ID ) >= intval( $seats_total ) ) {
 			return 'Sorry registration for this training is full.';
 		}
 
@@ -82,11 +75,19 @@ function mu_hr_registration_register_shortcode( $atts ) {
 
 		$training_info .= '.';
 
+		$recaptcha_site_key = mu_hr_training_recaptcha_site_key();
+		if ( $recaptcha_site_key ) {
+			wp_enqueue_script( 'google-recaptcha', 'https://www.google.com/recaptcha/api.js', array(), '2.0', true );
+		}
+
 		if ( get_field( 'mu_training_benefits_training', $training_session->ID ) && get_field( 'benefits_session_confirmation_url', 'option' ) ) {
 			$redirect_url = get_field( 'benefits_session_confirmation_url', 'option' );
 		} else {
 			$redirect_url = 'training/confirmation?mu-training=' . $training_session->ID;
 		}
+
+		$html_after_fields  = '<input type="hidden" name="acf[field_61ae470969cf8]" value="' . esc_attr( absint( get_query_var( 'courseid' ) ) ) . '" />';
+		$html_after_fields .= '<div class="g-recaptcha" data-sitekey="' . esc_attr( $recaptcha_site_key ) . '"></div>';
 
 		acf_form(
 			array(
@@ -100,7 +101,7 @@ function mu_hr_registration_register_shortcode( $atts ) {
 				'fields'             => $fields,
 				'submit_value'       => 'Register',
 				'html_submit_button' => '<input type="submit" class="acf-button button button-primary button-large button--green" value="%s" />',
-				'html_after_fields'  => '<input type="hidden" name="acf[field_61ae470969cf8]" value="' . esc_attr( absint( get_query_var( 'courseid' ) ) ) . '" />',
+				'html_after_fields'  => $html_after_fields,
 				'html_before_fields' => '<div class="w-full">' . do_shortcode( '[mu-hr-session-individual class="pb-12"]' ) . '</div>',
 			)
 		);
@@ -128,6 +129,9 @@ function mu_hr_registration_registration_list( $atts ) {
 		return 'Sorry that course was not found.';
 	} else {
 		$training_session = get_post( absint( get_query_var( 'courseid' ) ) );
+		if ( ! $training_session || 'mu-session' !== $training_session->post_type ) {
+			return 'Sorry that course was not found.';
+		}
 
 		$registrations = get_posts(
 			array(
@@ -172,14 +176,16 @@ function mu_hr_registration_registration_list( $atts ) {
 		$html .= '<tbody>';
 		foreach ( $registrations as $registration ) {
 			$html .= '<tr>';
-			$html .= '<td>' . get_field( 'muhr_registration_last_name', $registration->ID ) . '</td>';
-			$html .= '<td>' . get_field( 'muhr_registration_first_name', $registration->ID ) . '</td>';
-			$html .= '<td>' . get_field( 'muhr_registration_department', $registration->ID ) . '</td>';
-			$html .= '<td><a href="mailto:' . get_field( 'muhr_registration_email_address', $registration->ID ) . '">' . get_field( 'muhr_registration_email_address', $registration->ID ) . '</a></td>';
-			$html .= '<td>' . get_field( 'muhr_registration_mu_id', $registration->ID ) . '</td>';
-			$html .= '<td>' . get_field( 'muhr_registration_person_attended', $registration->ID ) . '</td>';
+			$email = sanitize_email( get_field( 'muhr_registration_email_address', $registration->ID ) );
+
+			$html .= '<td>' . esc_html( get_field( 'muhr_registration_last_name', $registration->ID ) ) . '</td>';
+			$html .= '<td>' . esc_html( get_field( 'muhr_registration_first_name', $registration->ID ) ) . '</td>';
+			$html .= '<td>' . esc_html( get_field( 'muhr_registration_department', $registration->ID ) ) . '</td>';
+			$html .= '<td><a href="' . esc_url( 'mailto:' . $email ) . '">' . esc_html( $email ) . '</a></td>';
+			$html .= '<td>' . esc_html( get_field( 'muhr_registration_mu_id', $registration->ID ) ) . '</td>';
+			$html .= '<td>' . esc_html( get_field( 'muhr_registration_person_attended', $registration->ID ) ) . '</td>';
 			if ( current_user_can( 'manage_options' ) ) {
-				$html .= '<td><a href="' . esc_url( home_url() ) . '/wp-admin/post.php?post=' . esc_attr( $registration->ID ) . '&action=edit">Edit this Registration</a></td>';
+				$html .= '<td><a href="' . esc_url( get_edit_post_link( $registration->ID ) ) . '">Edit this Registration</a></td>';
 			}
 			$html .= '</tr>';
 		}
@@ -221,21 +227,14 @@ function mu_hr_registration_individual_session( $atts ) {
 	}
 
 	$training_session = get_post( $session_id );
+	if ( ! $training_session || 'mu-session' !== $training_session->post_type ) {
+		return 'This session could not be found.';
+	}
 
-	$registrations = get_posts(
-		array(
-			'numberposts' => -1,
-			'post_type'   => 'mu-registrations',
-			'meta_key'    => 'muhr_registration_training_session', // phpcs:ignore
-			'meta_value'  => $training_session->ID, // phpcs:ignore
-		)
-	);
-
+	$seats_taken = mu_hr_training_registration_count( $training_session->ID );
 	$seats_total = get_field( 'mu_training_training_seats', $training_session->ID );
 
-	$seats_left = intval( $seats_total ) - intval( count( $registrations ) );
-
-	wp_reset_postdata();
+	$seats_left = intval( $seats_total ) - $seats_taken;
 
 	$output  = '<div id="course' . esc_attr( $training_session->ID ) . '"  class="block">';
 	$output .= '<div class="flex flex-col border-gray-100 border rounded my-6">';
@@ -259,7 +258,7 @@ function mu_hr_registration_individual_session( $atts ) {
 		$output .= '<div class="text-sm"><span class="font-semibold">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', get_the_ID() ) ) . '</div>';
 	}
 
-	$output .= '<div class="text-sm">' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $training_session->ID ) )->format( 'F j, g:ia' ) ) . ' - ' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_end_time', $training_session->ID ) )->format( 'g:ia' ) ) . ' · <span class="font-semibold">' . esc_attr( $seats_left ) . '</span> spots remaining</div> <span class="hidden">Seats taken: ' . intval( count( $registrations ) ) . '</span>';
+	$output .= '<div class="text-sm">' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $training_session->ID ) )->format( 'F j, g:ia' ) ) . ' - ' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_end_time', $training_session->ID ) )->format( 'g:ia' ) ) . ' · <span class="font-semibold">' . esc_attr( $seats_left ) . '</span> spots remaining</div> <span class="hidden">Seats taken: ' . intval( $seats_taken ) . '</span>';
 	$output .= '<div class="text-sm"><span class="font-semibold">Instructor:</span> ' . esc_attr( get_field( 'mu_training_instructor', $training_session->ID )['instructor_name'] ) . ' (<a href="' . esc_url( home_url() ) . '/training/registered-list/?courseid=' . esc_attr( $training_session->ID ) . '">Instructor Access</a>)</div>';
 
 	$training = get_term( get_field( 'mu_training_type', $training_session->ID ), 'mu-training' );
@@ -274,7 +273,7 @@ function mu_hr_registration_individual_session( $atts ) {
 
 	if ( $data['show_register_button'] ) {
 		$output .= '<div class="mt-6">';
-		$output .= '<a href="' . esc_url( home_url() ) . '/training/registration/?courseid=' . esc_attr( $training_session ) . '" class="button button--primary">Register</a>';
+		$output .= '<a href="' . esc_url( home_url() ) . '/training/registration/?courseid=' . esc_attr( $training_session->ID ) . '" class="button button--primary">Register</a>';
 		$output .= '</div>';
 	}
 

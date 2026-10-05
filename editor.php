@@ -82,7 +82,7 @@ function mu_hr_training_custom_columns_data( $column, $post_id ) {
 			echo esc_attr( get_post_meta( $post_id, 'mu_training_training_seats', true ) );
 			break;
 		case 'reglist':
-			echo '<a href="https://www.marshall.edu/human-resources/training/registered-list/?courseid=' . esc_attr( $post_id ) . '">Registration List</a>';
+			echo '<a href="' . esc_url( home_url( '/training/registered-list/?courseid=' . absint( $post_id ) ) ) . '">Registration List</a>';
 			break;
 	}
 }

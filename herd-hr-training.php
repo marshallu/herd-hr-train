@@ -9,7 +9,7 @@
  * Plugin Name:  Herd HR Training
  * Plugin URI: https://www.marshall.edu
  * Description: Plugin to allow MU Human Resources to list trainings and allow individuals to register for training.
- * Version: 1.1.5
+ * Version: 1.1.6
  * Author: Christopher McComas
  */
 
@@ -117,20 +117,22 @@ function mu_hr_training_registration_post_type() {
 		'items_list'            => _x( 'Training Registrations list', 'Screen reader text for the items list heading on the post type listing screen. Default “Posts list”/”Pages list”. Added in 4.4', 'mu-hr-training' ),
 	);
 
+	// Registrations hold personal data, so they are admin-only: no archive,
+	// no single views, no REST endpoint and no search results.
 	$args = array(
 		'labels'              => $labels,
-		'public'              => true,
-		'publicly_queryable'  => true,
+		'public'              => false,
+		'publicly_queryable'  => false,
 		'show_ui'             => true,
 		'show_in_menu'        => true,
-		'query_var'           => true,
-		'rewrite'             => array( 'slug' => '/registration' ),
+		'query_var'           => false,
+		'rewrite'             => false,
 		'capability_type'     => 'post',
-		'has_archive'         => true,
+		'has_archive'         => false,
 		'hierarchical'        => true,
 		'supports'            => array( 'title', 'custom-fields', 'revisions' ),
-		'show_in_rest'        => true,
-		'exclude_from_search' => false,
+		'show_in_rest'        => false,
+		'exclude_from_search' => true,
 		'menu_icon'           => 'dashicons-clipboard',
 		'menu_position'       => 58,
 	);
@@ -233,7 +235,8 @@ function mu_hr_training_training_taxonomy_query( $query ) {
 			array(
 				array(
 					'key'     => 'mu_training_start_time',
-					'value'   => wp_date( 'Y-m-d H:i:s', null, $timezone ),
+					// Round to the hour so the SQL stays the same long enough to be cached.
+					'value'   => wp_date( 'Y-m-d H:00:00', null, $timezone ),
 					'type'    => 'DATETIME',
 					'compare' => '>=',
 				),
@@ -284,12 +287,21 @@ function mu_hr_training_query_parameter( $vars ) {
 add_filter( 'query_vars', 'mu_hr_training_query_parameter' );
 
 /**
- * Add 'courseid' to the acceptable URL parameters
+ * Get the current URL, encoded for use as the CAS service parameter.
+ *
+ * The scheme and host come from home_url() and the path from REQUEST_URI.
+ * Passing REQUEST_URI to home_url() would repeat the subdirectory site path.
  *
  * @return string
  */
 function mu_hr_cas_service_url() {
-	$current_url = home_url( wp_unslash( $_SERVER['REQUEST_URI'] ?? '/' ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+	$home        = wp_parse_url( home_url() );
+	$current_url = $home['scheme'] . '://' . $home['host'];
+	if ( ! empty( $home['port'] ) ) {
+		$current_url .= ':' . $home['port'];
+	}
+	$current_url .= wp_unslash( $_SERVER['REQUEST_URI'] ?? '/' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+
 	return rawurlencode( $current_url );
 }
 
@@ -320,7 +332,7 @@ function mu_hr_page_get_service_url_without_ticket() {
 	$service_url       = mu_hr_cas_service_url();
 	$service_url       = urldecode( $service_url );
 	$service_url_parts = wp_parse_url( $service_url );
-	parse_str( $service_url_parts['query'], $query_string_parts );
+	parse_str( $service_url_parts['query'] ?? '', $query_string_parts );
 
 	$query_string = '?';
 	foreach ( $query_string_parts as $key => $value ) {
@@ -328,9 +340,14 @@ function mu_hr_page_get_service_url_without_ticket() {
 			$query_string .= rawurlencode( $key ) . '=' . rawurlencode( $value ) . '&';
 		}
 	}
-	$query_string = rtrim( $query_string, '&' );
+	$query_string = rtrim( $query_string, '?&' );
 
-	return rawurlencode( $service_url_parts['scheme'] . '://' . $service_url_parts['host'] . $service_url_parts['path'] . $query_string );
+	$host = $service_url_parts['host'];
+	if ( ! empty( $service_url_parts['port'] ) ) {
+		$host .= ':' . $service_url_parts['port'];
+	}
+
+	return rawurlencode( $service_url_parts['scheme'] . '://' . $host . ( $service_url_parts['path'] ?? '/' ) . $query_string );
 }
 
 /**
@@ -339,9 +356,9 @@ function mu_hr_page_get_service_url_without_ticket() {
  * @return string|bool
  */
 function mu_hr_get_ticket() {
-	parse_str( $_SERVER['QUERY_STRING'], $query_string_parts ); // phpcs:ignore
+	parse_str( $_SERVER['QUERY_STRING'] ?? '', $query_string_parts ); // phpcs:ignore
 
-	if ( ! isset( $query_string_parts['ticket'] ) ) {
+	if ( empty( $query_string_parts['ticket'] ) || ! is_string( $query_string_parts['ticket'] ) ) {
 		return false;
 	}
 
@@ -353,15 +370,15 @@ function mu_hr_get_ticket() {
  *
  * @param string $ticket The ticket to validate.
  *
- * @return object
+ * @return object|false The decoded CAS response, or false if validation failed.
  */
 function mu_hr_validate_cas_ticket( $ticket ) {
 	$validation_url = mu_hr_validation_url( $ticket );
-	$data           = wp_remote_get( $validation_url );
-	if ( is_wp_error( $data ) ) {
+	$data           = wp_remote_get( $validation_url, array( 'timeout' => 3 ) );
+	if ( is_wp_error( $data ) || 200 !== wp_remote_retrieve_response_code( $data ) ) {
 		return false;
 	}
-	$xml = simplexml_load_string( $data['body'], 'SimpleXMLElement', LIBXML_NOENT | LIBXML_NONET );
+	$xml = simplexml_load_string( wp_remote_retrieve_body( $data ), 'SimpleXMLElement', LIBXML_NONET );
 	if ( false === $xml ) {
 		return false;
 	}
@@ -379,7 +396,7 @@ function mu_hr_validate_cas_ticket( $ticket ) {
  */
 function mu_hr_validation_url( $ticket ) {
 	$service_url = mu_hr_page_get_service_url_without_ticket();
-	return 'https://auth.marshall.edu/cas/p3/serviceValidate?service=' . $service_url . '&ticket=' . $ticket;
+	return 'https://auth.marshall.edu/cas/p3/serviceValidate?service=' . $service_url . '&ticket=' . rawurlencode( $ticket );
 }
 
 /**
@@ -409,17 +426,22 @@ function mu_hr_registration_check_cas() {
 
 		$cas_response = mu_hr_validate_cas_ticket( $ticket );
 
-		if ( ! $cas_response->authenticationSuccess ) { // phpcs:ignore
+		if ( ! $cas_response || empty( $cas_response->authenticationSuccess->user ) ) { // phpcs:ignore
 			$login_url = mu_hr_get_login_url();
 			wp_redirect( $login_url ); // phpcs:ignore
 			exit;
 		}
 
-		$admins     = get_field( 'mu_hr_administrators', 'option' );
+		$admins     = (string) get_field( 'mu_hr_administrators', 'option' );
 		$can_access = array_map( 'trim', explode( ',', $admins ) );
 
-		$can_access[] = get_field( 'mu_training_instructor', $training_session_id )['instructor_username'];
-		$can_access[] = get_field( 'mu_training_instructor', $training_session_id )['backup_instructor_username'];
+		$instructor = get_field( 'mu_training_instructor', $training_session_id );
+		if ( is_array( $instructor ) ) {
+			$can_access[] = $instructor['instructor_username'] ?? '';
+			$can_access[] = $instructor['backup_instructor_username'] ?? '';
+		}
+
+		$can_access = array_filter( $can_access );
 
 		if ( in_array( $cas_response->authenticationSuccess->user, $can_access, true ) ) { // phpcs:ignore
 			$can_access = array();
@@ -434,15 +456,49 @@ function mu_hr_registration_check_cas() {
 add_action( 'template_redirect', 'mu_hr_registration_check_cas' );
 
 /**
- * Set header on registration lists so Pantheon doesn't cache the page.
+ * Send no-cache headers on pages that show seat counts, the registration
+ * form or a registration list, so the edge cache never serves stale counts,
+ * expired form nonces or another person's registration list.
  */
-function mu_hr_training_no_cache_on_regisration_list_page() {
-	$postid = get_queried_object_id();
-	if ( is_page( 'registered-list' ) ) {
-		header( 'Cache-Control: no-cache, must-revalidate, max-age=0' );
+function mu_hr_training_no_cache_on_registration_pages() {
+	$no_cache = is_tax( 'mu-training' ) || is_page( array( 'registration', 'registered-list' ) );
+
+	if ( ! $no_cache && is_singular() ) {
+		$content = (string) get_post_field( 'post_content', get_queried_object_id() );
+		foreach ( array( 'mu-hr-register', 'mu-hr-registration-list', 'mu-hr-session-individual' ) as $shortcode ) {
+			if ( has_shortcode( $content, $shortcode ) ) {
+				$no_cache = true;
+				break;
+			}
+		}
+	}
+
+	if ( $no_cache ) {
+		nocache_headers();
 	}
 }
-add_action( 'template_redirect', 'mu_hr_training_no_cache_on_regisration_list_page' );
+add_action( 'template_redirect', 'mu_hr_training_no_cache_on_registration_pages', 1 );
+
+/**
+ * Count the registrations for a training session.
+ *
+ * @param int $session_id The ID of the training session.
+ * @return int
+ */
+function mu_hr_training_registration_count( $session_id ) {
+	$registrations = get_posts(
+		array(
+			'numberposts'   => -1,
+			'post_type'     => 'mu-registrations',
+			'fields'        => 'ids',
+			'no_found_rows' => true,
+			'meta_key'      => 'muhr_registration_training_session', // phpcs:ignore
+			'meta_value'    => absint( $session_id ), // phpcs:ignore
+		)
+	);
+
+	return count( $registrations );
+}
 
 if ( function_exists( 'acf_add_options_page' ) ) {
 	acf_add_options_page(
@@ -450,7 +506,7 @@ if ( function_exists( 'acf_add_options_page' ) ) {
 			'page_title' => 'HR Registration Settings',
 			'menu_title' => 'HR Registration Settings',
 			'menu_slug'  => 'hr-registration-settings',
-			'capability' => 'edit_posts',
+			'capability' => 'manage_options',
 			'redirect'   => false,
 		)
 	);

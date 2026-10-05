@@ -17,10 +17,118 @@ function mu_hr_training_acf_form_deregister_styles() {
 add_action( 'wp_enqueue_scripts', 'mu_hr_training_acf_form_deregister_styles' );
 
 /**
+ * Get the public reCAPTCHA site key.
+ *
+ * Read the site key from HR Registration Settings, with wp-config.php and a
+ * filter available as deployment overrides.
+ *
+ * @return string
+ */
+function mu_hr_training_recaptcha_site_key() {
+	$site_key = get_field( 'mu_hr_training_recaptcha_site_key', 'option' );
+	if ( ! $site_key && defined( 'MU_HR_TRAINING_RECAPTCHA_SITE_KEY' ) ) {
+		$site_key = MU_HR_TRAINING_RECAPTCHA_SITE_KEY;
+	}
+
+	return (string) apply_filters( 'mu_hr_training_recaptcha_site_key', $site_key );
+}
+
+/**
+ * Get the private reCAPTCHA secret key.
+ *
+ * Read the secret key from HR Registration Settings, with wp-config.php and a
+ * filter available as deployment overrides.
+ *
+ * @return string
+ */
+function mu_hr_training_recaptcha_secret_key() {
+	$secret_key = get_field( 'mu_hr_training_recaptcha_secret_key', 'option' );
+	if ( ! $secret_key && defined( 'MU_HR_TRAINING_RECAPTCHA_SECRET_KEY' ) ) {
+		$secret_key = MU_HR_TRAINING_RECAPTCHA_SECRET_KEY;
+	}
+
+	return (string) apply_filters( 'mu_hr_training_recaptcha_secret_key', $secret_key );
+}
+
+/**
+ * Validate the reCAPTCHA response before ACF creates a registration post.
+ */
+function mu_hr_training_validate_recaptcha() {
+	if ( is_admin() || empty( $_POST['acf'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		return;
+	}
+
+	$site_key   = mu_hr_training_recaptcha_site_key();
+	$secret_key = mu_hr_training_recaptcha_secret_key();
+	$token      = isset( $_POST['g-recaptcha-response'] ) ? sanitize_text_field( wp_unslash( $_POST['g-recaptcha-response'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+	if ( '' === $site_key || '' === $secret_key ) {
+		acf_add_validation_error( '', __( 'This form is not configured for registration yet. Please contact Human Resources.', 'mu-hr-training' ) );
+		return;
+	}
+
+	if ( '' === $token ) {
+		acf_add_validation_error( '', __( 'Please complete the CAPTCHA before registering.', 'mu-hr-training' ) );
+		return;
+	}
+
+	$verification = wp_remote_post(
+		'https://www.google.com/recaptcha/api/siteverify',
+		array(
+			'timeout' => 10,
+			'body'    => array(
+				'secret'   => $secret_key,
+				'response' => $token,
+			),
+		)
+	);
+
+	$verified = false;
+	if ( ! is_wp_error( $verification ) && 200 === wp_remote_retrieve_response_code( $verification ) ) {
+		$result   = json_decode( wp_remote_retrieve_body( $verification ), true );
+		$verified = ! empty( $result['success'] );
+	}
+
+	if ( ! $verified ) {
+		acf_add_validation_error( '', __( 'The CAPTCHA could not be verified. Please try again.', 'mu-hr-training' ) );
+	}
+}
+add_action( 'acf/validate_save_post', 'mu_hr_training_validate_recaptcha' );
+
+/**
+ * Reject a registration when the training session is already full.
+ *
+ * The seat count on the form page can be out of date, so check it again
+ * before ACF creates the registration post.
+ */
+function mu_hr_training_validate_capacity() {
+	// phpcs:disable WordPress.Security.NonceVerification -- ACF verifies the form nonce before this hook runs.
+	if ( is_admin() || empty( $_POST['acf']['field_61ae470969cf8'] ) ) {
+		return;
+	}
+
+	$session_id = absint( $_POST['acf']['field_61ae470969cf8'] );
+	// phpcs:enable WordPress.Security.NonceVerification
+
+	if ( ! $session_id || 'mu-session' !== get_post_type( $session_id ) ) {
+		acf_add_validation_error( '', __( 'Sorry that course was not found.', 'mu-hr-training' ) );
+		return;
+	}
+
+	$seats_total = intval( get_field( 'mu_training_training_seats', $session_id ) );
+	if ( mu_hr_training_registration_count( $session_id ) >= $seats_total ) {
+		acf_add_validation_error( '', __( 'Sorry registration for this training is full.', 'mu-hr-training' ) );
+	}
+}
+add_action( 'acf/validate_save_post', 'mu_hr_training_validate_capacity' );
+
+/**
  * Register acf_form_head
+ *
+ * Only run it when an ACF front-end form was submitted, rather than on every request.
  */
 function mu_hr_training_form_head() {
-	if ( ! is_admin() ) {
+	if ( ! is_admin() && ! empty( $_POST['_acf_form'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		acf_form_head();
 	}
 }
@@ -230,10 +338,10 @@ function mu_hr_registration_submitted_registration( $post_id ) {
 		$email_body .= '</tr>';
 		$email_body .= '</table>';
 
-			$request_email = sanitize_email( get_field( 'muhr_registration_request_email', $post_id ) );
-		$supervisor_email  = sanitize_email( get_field( 'muhr_registration_supervisor_email', $post_id ) );
-		$to_addresses      = array_filter( array( 'benefits@marshall.edu', $request_email, $supervisor_email ), 'is_email' );
-		$to                = implode( ',', $to_addresses );
+		$request_email    = sanitize_email( get_field( 'muhr_registration_request_email', $post_id ) );
+		$supervisor_email = sanitize_email( get_field( 'muhr_registration_supervisor_email', $post_id ) );
+		$to_addresses     = array_filter( array( 'benefits@marshall.edu', $request_email, $supervisor_email ), 'is_email' );
+		$to               = implode( ',', $to_addresses );
 
 		$headers   = array();
 		$headers[] = 'Content-Type: text/html; charset=UTF-8';
