@@ -184,9 +184,9 @@ function mu_hr_registration_submitted_registration( $post_id ) {
 		$course_location = get_field( 'mu_training_training_location', $training_session->ID );
 	}
 
-	$course_day        = DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $training_session->ID ) )->format( 'F j, Y' );
-	$course_start_time = DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $training_session->ID ) )->format( 'g:i a' );
-	$course_end_time   = DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_end_time', $training_session->ID ) )->format( 'g:i a' );
+	$course_day        = mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'F j, Y' );
+	$course_start_time = mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'g:i a' );
+	$course_end_time   = mu_hr_training_session_time( $training_session->ID, 'mu_training_end_time', 'g:i a' );
 
 	if ( get_field( 'muhr_registration_email_address', $post_id ) && ! is_admin() ) {
 		$email_body = 'You have successfully registered for ' . $course_name . ' at ' . $course_location;
@@ -265,7 +265,7 @@ function mu_hr_registration_submitted_registration( $post_id ) {
 		$email_body .= '<tr style="border-bottom: 1px solid #999">';
 		$email_body .= '<td style="font-weight: 600; line-height: 125%; padding: 10px 10px;" valign="top" width="50%">Date of Birth</td>';
 
-		$dob = DateTime::createFromFormat( 'd/m/Y', get_field( 'muhr_registration_birthdate', $post_id ) )->format( 'F j, Y' );
+		$dob = mu_hr_training_format_date( get_field( 'muhr_registration_birthdate', $post_id ), 'd/m/Y', 'F j, Y' );
 
 		$email_body .= '<td style="line-height: 125%; padding: 10px 10px;" valign="top" width="50%">' . esc_attr( $dob ) . '</td>';
 		$email_body .= '</tr>';
@@ -284,7 +284,7 @@ function mu_hr_registration_submitted_registration( $post_id ) {
 		$email_body .= '<tr style="border-bottom: 1px solid #999">';
 		$email_body .= '<td style="font-weight: 600; line-height: 125%; padding: 10px 10px;" valign="top" width="50%">Hire Date</td>';
 
-		$hire_date = DateTime::createFromFormat( 'd/m/Y', get_field( 'muhr_registration_hiredate', $post_id ) )->format( 'F j, Y' );
+		$hire_date = mu_hr_training_format_date( get_field( 'muhr_registration_hiredate', $post_id ), 'd/m/Y', 'F j, Y' );
 
 		$email_body .= '<td style="line-height: 125%; padding: 10px 10px;" valign="top" width="50%">' . esc_attr( $hire_date ) . '</td>';
 		$email_body .= '</tr>';

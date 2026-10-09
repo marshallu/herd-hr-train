@@ -70,7 +70,7 @@ function mu_hr_registration_register_shortcode( $atts ) {
 		$training_info = 'Registering for ' . esc_attr( $training_session->post_title );
 
 		if ( get_field( 'mu_training_start_time', $training_session->ID ) && get_field( 'mu_training_end_time', $training_session->ID ) ) {
-			$training_info .= ' on ' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $training_session->ID ) )->format( 'F j, g:ia' ) ) . ' - ' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_end_time', $training_session->ID ) )->format( 'g:ia' ) );
+			$training_info .= ' on ' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'F j, g:ia' ) ) . ' - ' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_end_time', 'g:ia' ) );
 		}
 
 		$training_info .= '.';
@@ -241,8 +241,8 @@ function mu_hr_registration_individual_session( $atts ) {
 	$output .= '<div class="border-b border-gray-100 flex flex-row items-start py-4 px-4 lg:px-6">';
 
 	$output .= '<div class="flex-col flex w-12 lg:w-16 mx-auto">';
-	$output .= '<div class="bg-green text-white text-xl font-bold uppercase py-1 rounded-t text-center">' . DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $training_session->ID ) )->format( 'M' ) . '</div>';
-	$output .= '<div class="bg-gray-100 text-sm lg:text-xl font-bold uppercase py-1 rounded-b text-center">' . DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $training_session->ID ) )->format( 'j' ) . '</div>';
+	$output .= '<div class="bg-green text-white text-xl font-bold uppercase py-1 rounded-t text-center">' . mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'M' ) . '</div>';
+	$output .= '<div class="bg-gray-100 text-sm lg:text-xl font-bold uppercase py-1 rounded-b text-center">' . mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'j' ) . '</div>';
 	$output .= '</div>';
 
 	$output .= '<div class="ml-4 lg:ml-6 flex-1">';
@@ -258,7 +258,7 @@ function mu_hr_registration_individual_session( $atts ) {
 		$output .= '<div class="text-sm"><span class="font-semibold">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', get_the_ID() ) ) . '</div>';
 	}
 
-	$output .= '<div class="text-sm">' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_start_time', $training_session->ID ) )->format( 'F j, g:ia' ) ) . ' - ' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', get_field( 'mu_training_end_time', $training_session->ID ) )->format( 'g:ia' ) ) . ' · <span class="font-semibold">' . esc_attr( $seats_left ) . '</span> spots remaining</div> <span class="hidden">Seats taken: ' . intval( $seats_taken ) . '</span>';
+	$output .= '<div class="text-sm">' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'F j, g:ia' ) ) . ' - ' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_end_time', 'g:ia' ) ) . ' · <span class="font-semibold">' . esc_attr( $seats_left ) . '</span> spots remaining</div> <span class="hidden">Seats taken: ' . intval( $seats_taken ) . '</span>';
 	$output .= '<div class="text-sm"><span class="font-semibold">Instructor:</span> ' . esc_attr( get_field( 'mu_training_instructor', $training_session->ID )['instructor_name'] ) . ' (<a href="' . esc_url( home_url() ) . '/training/registered-list/?courseid=' . esc_attr( $training_session->ID ) . '">Instructor Access</a>)</div>';
 
 	$training = get_term( get_field( 'mu_training_type', $training_session->ID ), 'mu-training' );

@@ -9,7 +9,7 @@
  * Plugin Name:  Herd HR Training
  * Plugin URI: https://www.marshall.edu
  * Description: Plugin to allow MU Human Resources to list trainings and allow individuals to register for training.
- * Version: 1.1.6
+ * Version: 1.1.7
  * Author: Christopher McComas
  */
 
@@ -514,3 +514,31 @@ if ( function_exists( 'acf_add_options_page' ) ) {
 add_action( 'init', 'mu_hr_training_custom_taxonomy' );
 add_action( 'init', 'mu_hr_training_session_post_type' );
 add_action( 'init', 'mu_hr_training_registration_post_type' );
+
+/**
+ * Reformat a date string, returning a fallback when it can't be parsed.
+ *
+ * @param mixed  $value         The date string to parse.
+ * @param string $input_format  The format the date string is stored in.
+ * @param string $output_format The format to return.
+ * @param string $fallback      Returned when the value is empty or invalid.
+ * @return string
+ */
+function mu_hr_training_format_date( $value, $input_format, $output_format, $fallback = '' ) {
+	$date = is_string( $value ) && '' !== $value ? DateTime::createFromFormat( $input_format, $value ) : false;
+
+	return $date ? $date->format( $output_format ) : $fallback;
+}
+
+/**
+ * Format a training session's start or end time.
+ *
+ * @param int    $session_id The ID of the training session.
+ * @param string $field      The ACF field name, mu_training_start_time or mu_training_end_time.
+ * @param string $format     The format to return.
+ * @param string $fallback   Returned when the field is empty or invalid.
+ * @return string
+ */
+function mu_hr_training_session_time( $session_id, $field, $format, $fallback = '' ) {
+	return mu_hr_training_format_date( get_field( $field, $session_id ), 'Y-m-d H:i:s', $format, $fallback );
+}

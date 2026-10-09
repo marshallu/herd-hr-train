@@ -173,7 +173,7 @@ add_filter( 'post_row_actions', 'mu_hr_training_remove_view_action', 10, 1 );
 function mu_hr_training_full_training_name_for_registration_relation( $text, $post ) {
 	$start_time = get_field( 'mu_training_start_time', $post->ID );
 	if ( $start_time ) {
-		$text .= ' ' . esc_attr( DateTime::createFromFormat( 'Y-m-d H:i:s', $start_time )->format( 'F j, Y g:i a' ) );
+		$text .= ' ' . esc_attr( mu_hr_training_format_date( $start_time, 'Y-m-d H:i:s', 'F j, Y g:i a' ) );
 	}
 	return $text;
 }
