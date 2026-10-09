@@ -9,7 +9,7 @@
  * Plugin Name:  Herd HR Training
  * Plugin URI: https://www.marshall.edu
  * Description: Plugin to allow MU Human Resources to list trainings and allow individuals to register for training.
- * Version: 1.1.7
+ * Version: 1.1.8
  * Author: Christopher McComas
  */
 
@@ -254,7 +254,17 @@ add_action( 'pre_get_posts', 'mu_hr_training_training_taxonomy_query' );
 function mu_hr_training_redirect_sessions_to_anchor_on_list() {
 	if ( is_singular( 'mu-session' ) ) {
 		global $post;
-		$url = get_term_link( get_field( 'mu_training_type', $post->ID ) ) . '#course' . $post->ID;
+		$training_id = get_field( 'mu_training_type', $post->ID );
+		if ( empty( $training_id ) ) {
+			return;
+		}
+
+		$url = get_term_link( (int) $training_id, 'mu-training' );
+		if ( is_wp_error( $url ) ) {
+			return;
+		}
+
+		$url .= '#course' . $post->ID;
 		wp_safe_redirect( esc_url( $url ), 301 );
 		exit;
 	}
