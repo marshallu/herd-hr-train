@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+log_step() {
+	local label="$1"
+	shift
+	local started=$SECONDS
+
+	printf '[orb setup] %s...\n' "$label"
+	"$@"
+	printf '[orb setup] %s completed in %ss.\n' "$label" "$(( SECONDS - started ))"
+}
+
+system_packages=(php-cli php-curl php-xml composer)
+missing_packages=()
+
+for package in "${system_packages[@]}"; do
+	if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed'; then
+		missing_packages+=("$package")
+	fi
+done
+
+if (( ${#missing_packages[@]} > 0 )); then
+	printf '[orb setup] Installing system packages: %s\n' "${missing_packages[*]}"
+	started=$SECONDS
+	sudo apt-get update
+	sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing_packages[@]}"
+	printf '[orb setup] System packages completed in %ss.\n' "$(( SECONDS - started ))"
+else
+	printf '[orb setup] System packages are already installed.\n'
+fi
+
+php_dependency_key="$(sha256sum composer.json composer.lock | sha256sum | cut -d ' ' -f 1)"
+php_dependency_marker='vendor/.amp-dependency-key'
+
+if [[ ! -f "$php_dependency_marker" ]] || [[ "$(< "$php_dependency_marker")" != "$php_dependency_key" ]]; then
+	printf '[orb setup] Resetting PHP dependencies for the current lockfile.\n'
+	rm -rf vendor
+fi
+
+log_step 'Installing PHP dependencies' \
+	composer install --no-interaction --prefer-dist --no-progress
+printf '%s\n' "$php_dependency_key" > "$php_dependency_marker"
+log_step 'Installing Node dependencies' \
+	npm ci --no-audit --no-fund
+log_step 'Installing the Git pre-commit hook' \
+	./node_modules/.bin/lefthook install
+
+printf '[orb setup] Repository setup is ready.\n'
