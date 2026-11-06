@@ -89,6 +89,9 @@ function mu_hr_registration_register_shortcode( $atts ) {
 		$html_after_fields  = '<input type="hidden" name="acf[field_61ae470969cf8]" value="' . esc_attr( absint( get_query_var( 'courseid' ) ) ) . '" />';
 		$html_after_fields .= '<div class="g-recaptcha" data-sitekey="' . esc_attr( $recaptcha_site_key ) . '"></div>';
 
+		// acf_form_head() only runs on submit, so load ACF's scripts (date pickers, validation) here.
+		acf_enqueue_scripts();
+
 		acf_form(
 			array(
 				'id'                 => 'new-registration',
