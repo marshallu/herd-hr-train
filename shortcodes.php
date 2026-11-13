@@ -258,9 +258,9 @@ function mu_hr_registration_individual_session( $atts ) {
 		$training_info = ' at ' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) );
 		$output       .= '<div class="muhr-session__meta"><span class="muhr-session__label">Location:</span> <a href="' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '">Training Link</a></div>';
 	} elseif ( 'hybrid' === get_field( 'mu_training_style', $training_session->ID ) ) {
-		$output .= '<div class="muhr-session__meta"><span class="muhr-session__label">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', get_the_ID() ) ) . ' and <a href="' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '">' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '</a></div>';
+		$output .= '<div class="muhr-session__meta"><span class="muhr-session__label">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', $training_session->ID ) ) . ' and <a href="' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '">' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '</a></div>';
 	} else {
-		$output .= '<div class="muhr-session__meta"><span class="muhr-session__label">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', get_the_ID() ) ) . '</div>';
+		$output .= '<div class="muhr-session__meta"><span class="muhr-session__label">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', $training_session->ID ) ) . '</div>';
 	}
 
 	$output .= '<div class="muhr-session__meta">' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'F j, g:ia' ) ) . ' - ' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_end_time', 'g:ia' ) ) . ' · <span class="muhr-session__seats">' . esc_attr( $seats_left ) . '</span> spots remaining</div> <span class="muhr-session__seats-taken">Seats taken: ' . intval( $seats_taken ) . '</span>';
