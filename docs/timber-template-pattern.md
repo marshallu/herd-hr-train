@@ -69,7 +69,7 @@ Put your Twig file in `templates/` inside your plugin. Extend `base.twig` to get
 {% block content %}
 {% include 'partials/no-hero.twig' %}
 
-<div class="w-full xl:max-w-screen-xl px-6 xl:px-0 xl:mx-auto pt-4 lg:pt-12 pb-16">
+<div class="muhr-archive">
     {# your content here #}
 </div>
 {% endblock %}

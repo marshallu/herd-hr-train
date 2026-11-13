@@ -4,12 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-### CSS
-```bash
-npm run dev    # Watch and compile Tailwind CSS (development)
-npm run build  # Minify Tailwind CSS (production)
-```
-
 ### PHP Code Quality
 ```bash
 composer lint    # Run PHPCS standards check
@@ -64,7 +58,7 @@ Registration list access is gated by CAS (auth.marshall.edu). The plugin validat
 
 ### CSS
 
-Tailwind source lives in `source/css/herd-hr-train.css`. Compiled output goes to `css/herd-hr-train.css`. The `phpcs.xml.dist` excludes `css/`, `js/`, `source/`, and `vendor/` from linting.
+Styles are plain CSS in `css/herd-hr-train.css`, with no build step. Class names follow BEM (`block__element--modifier`) and every block is prefixed `muhr-` (for example `muhr-session__title`) so they cannot clash with the theme or other plugins. Use semantic or theme classes (such as `button button--primary`) only where the plugin deliberately reuses theme styling. ACF generates the registration form markup, so those rules target ACF's classes scoped under `.muhr-registration-form`. The `phpcs.xml.dist` excludes `css/`, `js/`, `source/`, and `vendor/` from linting.
 
 ### Email Notifications
 

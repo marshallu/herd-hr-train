@@ -105,7 +105,10 @@ function mu_hr_registration_register_shortcode( $atts ) {
 				'submit_value'       => 'Register',
 				'html_submit_button' => '<input type="submit" class="acf-button button button-primary button-large button--green" value="%s" />',
 				'html_after_fields'  => $html_after_fields,
-				'html_before_fields' => '<div class="w-full">' . do_shortcode( '[mu-hr-session-individual class="pb-12"]' ) . '</div>',
+				'html_before_fields' => '<div class="muhr-registration-form__session">' . do_shortcode( '[mu-hr-session-individual]' ) . '</div>',
+				'form_attributes'    => array(
+					'class' => 'acf-form muhr-registration-form',
+				),
 			)
 		);
 	}
@@ -161,8 +164,8 @@ function mu_hr_registration_registration_list( $atts ) {
 		);
 
 		$html  = '<h2>Individuals Registered for ' . esc_attr( $training_session->post_title ) . '</h2>';
-		$html .= '<div class="large-table">';
-		$html .= '<table class="table w-full table-striped table-bordered">';
+		$html .= '<div class="large-table muhr-registrations">';
+		$html .= '<table class="table table-striped table-bordered muhr-registrations__table">';
 		$html .= '<thead>';
 		$html .= '<tr>';
 		$html .= '<th>Last Name</th>';
@@ -239,48 +242,46 @@ function mu_hr_registration_individual_session( $atts ) {
 
 	$seats_left = intval( $seats_total ) - $seats_taken;
 
-	$output  = '<div id="course' . esc_attr( $training_session->ID ) . '"  class="block">';
-	$output .= '<div class="flex flex-col border-gray-100 border rounded my-6">';
-	$output .= '<div class="border-b border-gray-100 flex flex-row items-start py-4 px-4 lg:px-6">';
+	$output  = '<div id="course' . esc_attr( $training_session->ID ) . '" class="muhr-session">';
+	$output .= '<div class="muhr-session__content">';
 
-	$output .= '<div class="flex-col flex w-12 lg:w-16 mx-auto">';
-	$output .= '<div class="bg-green text-white text-xl font-bold uppercase py-1 rounded-t text-center">' . mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'M' ) . '</div>';
-	$output .= '<div class="bg-gray-100 text-sm lg:text-xl font-bold uppercase py-1 rounded-b text-center">' . mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'j' ) . '</div>';
+	$output .= '<div class="muhr-session__date">';
+	$output .= '<div class="muhr-session__month">' . mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'M' ) . '</div>';
+	$output .= '<div class="muhr-session__day">' . mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'j' ) . '</div>';
 	$output .= '</div>';
 
-	$output .= '<div class="ml-4 lg:ml-6 flex-1">';
-	$output .= '<div class="">';
-	$output .= '<span class="font-semibold">' . esc_attr( $training_session->post_title ) . '</span>';
+	$output .= '<div class="muhr-session__body">';
+	$output .= '<div>';
+	$output .= '<span class="muhr-session__title">' . esc_attr( $training_session->post_title ) . '</span>';
 
 	if ( 'virtual' === get_field( 'mu_training_style', $training_session->ID ) ) {
 		$training_info = ' at ' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) );
-		$output       .= '<div class="text-sm"><span class="font-semibold">Location:</span> <a href="' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '">Training Link</a></div>';
+		$output       .= '<div class="muhr-session__meta"><span class="muhr-session__label">Location:</span> <a href="' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '">Training Link</a></div>';
 	} elseif ( 'hybrid' === get_field( 'mu_training_style', $training_session->ID ) ) {
-		$output .= '<div class="text-sm"><span class="font-semibold">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', get_the_ID() ) ) . ' and <a href="' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '">' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '</a></div>';
+		$output .= '<div class="muhr-session__meta"><span class="muhr-session__label">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', get_the_ID() ) ) . ' and <a href="' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '">' . esc_url( get_field( 'mu_training_training_url', $training_session->ID ) ) . '</a></div>';
 	} else {
-		$output .= '<div class="text-sm"><span class="font-semibold">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', get_the_ID() ) ) . '</div>';
+		$output .= '<div class="muhr-session__meta"><span class="muhr-session__label">Location:</span> ' . esc_attr( get_field( 'mu_training_training_location', get_the_ID() ) ) . '</div>';
 	}
 
-	$output .= '<div class="text-sm">' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'F j, g:ia' ) ) . ' - ' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_end_time', 'g:ia' ) ) . ' · <span class="font-semibold">' . esc_attr( $seats_left ) . '</span> spots remaining</div> <span class="hidden">Seats taken: ' . intval( $seats_taken ) . '</span>';
-	$output .= '<div class="text-sm"><span class="font-semibold">Instructor:</span> ' . esc_attr( get_field( 'mu_training_instructor', $training_session->ID )['instructor_name'] ) . ' (<a href="' . esc_url( home_url() ) . '/training/registered-list/?courseid=' . esc_attr( $training_session->ID ) . '">Instructor Access</a>)</div>';
+	$output .= '<div class="muhr-session__meta">' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_start_time', 'F j, g:ia' ) ) . ' - ' . esc_attr( mu_hr_training_session_time( $training_session->ID, 'mu_training_end_time', 'g:ia' ) ) . ' · <span class="muhr-session__seats">' . esc_attr( $seats_left ) . '</span> spots remaining</div> <span class="muhr-session__seats-taken">Seats taken: ' . intval( $seats_taken ) . '</span>';
+	$output .= '<div class="muhr-session__meta"><span class="muhr-session__label">Instructor:</span> ' . esc_attr( get_field( 'mu_training_instructor', $training_session->ID )['instructor_name'] ) . ' (<a href="' . esc_url( home_url() ) . '/training/registered-list/?courseid=' . esc_attr( $training_session->ID ) . '">Instructor Access</a>)</div>';
 
 	$training = get_term( get_field( 'mu_training_type', $training_session->ID ), 'mu-training' );
 
 	if ( get_field( 'mu_training_course_description', $training_session->ID ) ) {
-		$output .= '<div class="my-4">' . wp_kses_post( get_field( 'mu_training_course_description', $training_session->ID ) ) . '</div>';
+		$output .= '<div class="muhr-session__description">' . wp_kses_post( get_field( 'mu_training_course_description', $training_session->ID ) ) . '</div>';
 	} else {
-		$output .= '<div class="my-4">' . wp_kses_post( $training->description ) . '</div>';
+		$output .= '<div class="muhr-session__description">' . wp_kses_post( $training->description ) . '</div>';
 	}
 
 	$output .= '</div>';
 
 	if ( $data['show_register_button'] ) {
-		$output .= '<div class="mt-6">';
+		$output .= '<div class="muhr-session__actions">';
 		$output .= '<a href="' . esc_url( home_url() ) . '/training/registration/?courseid=' . esc_attr( $training_session->ID ) . '" class="button button--primary">Register</a>';
 		$output .= '</div>';
 	}
 
-	$output .= '</div>';
 	$output .= '</div>';
 	$output .= '</div>';
 	$output .= '</div>';
